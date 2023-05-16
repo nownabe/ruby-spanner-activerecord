@@ -185,7 +185,8 @@ module Models
 
       puts "==== spanner-cli ===="
       system(%Q[$(go env GOPATH)/bin/spanner-cli -p test-project -i test-instance -d #{database_id} -e "SELECT COLUMN_NAME, SPANNER_TYPE, IS_NULLABLE, GENERATION_EXPRESSION, CAST(COLUMN_DEFAULT AS STRING) AS COLUMN_DEFAULT, ORDINAL_POSITION FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='dynamic_items' ORDER BY ORDINAL_POSITION ASC;"])
-      puts "==== spanner-cli ===="
+      system(%Q[$(go env GOPATH)/bin/spanner-cli -p test-project -i test-instance -d #{database_id} -e "SHOW CREATE TABLE `dynamic_items`"])
+      puts
 
       item = DynamicItem.create!
       item.reload
