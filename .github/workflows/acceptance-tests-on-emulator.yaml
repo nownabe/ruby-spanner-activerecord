@@ -43,6 +43,11 @@ jobs:
         ruby-version: ${{ matrix.ruby }}
     - name: Install dependencies
       run: bundle install
+
+    - uses: actions/setup-go@v4
+    - name: Install spanner-cli
+      run: go install github.com/cloudspannerecosystem/spanner-cli@latest
+
     - name: Run acceptance tests on emulator
       run: bundle exec rake acceptance TEST=acceptance/cases/models/default_value_test.rb
       env:
