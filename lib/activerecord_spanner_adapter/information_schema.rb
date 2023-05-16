@@ -87,6 +87,11 @@ module ActiveRecordSpannerAdapter
           default = nil
         end
 
+        p row
+        p row["COLUMN_DEFAULT"]
+        p default
+        p default_function
+
         Table::Column.new \
           table_name,
           column_name,
