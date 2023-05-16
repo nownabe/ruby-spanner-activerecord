@@ -3,6 +3,50 @@
 require "test_helper"
 require "test_helpers/with_separate_database"
 
+module ActiveRecord
+  module ConnectionAdapters
+    module Spanner
+      module SchemaStatements
+        def create_table(table_name, id: :primary_key, **options)
+          td = create_table_definition table_name, options
+
+          if id
+            pk = options.fetch :primary_key do
+              Base.get_primary_key table_name.to_s.singularize
+            end
+            id = id.fetch :type, :primary_key if id.is_a? Hash
+
+            if pk.is_a? Array
+              td.primary_keys pk
+            else
+              td.primary_key pk, id, **{}
+            end
+          end
+
+          yield td if block_given?
+
+          statements = []
+
+          if options[:force]
+            statements.concat drop_table_with_indexes_sql(table_name, options)
+          end
+
+          statements << schema_creation.accept(td)
+
+          td.indexes.each do |column_name, index_options|
+            id = create_index_definition table_name, column_name, **index_options
+            statements << schema_creation.accept(id)
+          end
+
+          p statements
+
+          execute_schema_statements statements
+        end
+      end
+    end
+  end
+end
+
 module Models
   class DefaultValueTest < SpannerAdapter::TestCase
     include TestHelpers::WithSeparateDatabase
