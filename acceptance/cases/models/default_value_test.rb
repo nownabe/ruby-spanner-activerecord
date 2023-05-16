@@ -12,6 +12,7 @@ module ActiveRecord
             ActiveSupport::Dependencies.interlock.permit_concurrent_loads do
               puts "==== #{self.class}#execute_ddl ===="
               p statements
+              puts
               @connection.execute_ddl statements
             end
           end
@@ -53,6 +54,7 @@ module ActiveRecord
 
           puts "==== #{self.class}#create_table ===="
           p statements
+          puts
 
           execute_schema_statements statements
         end
@@ -78,6 +80,7 @@ module ActiveRecordSpannerAdapter
 
       puts "==== #{self.class}#execute_ddl ===="
       p statements
+      puts
 
       execute_ddl_statements statements, operation_id, wait_until_done
     end
@@ -85,10 +88,86 @@ module ActiveRecordSpannerAdapter
     def execute_ddl_statements statements, operation_id, wait_until_done
       puts "==== #{self.class}#execute_ddl_statements ===="
       p statements
+      puts
       job = database.update statements: statements, operation_id: operation_id
       job.wait_until_done! if wait_until_done
       raise Google::Cloud::Error.from_error job.error if job.error?
       job.done?
+    end
+  end
+end
+
+module Google
+  module Cloud
+    module Spanner
+      class Database
+        def update statements: [], operation_id: nil
+          ensure_service!
+          puts "==== #{self.class}#update ===="
+          p statements
+          puts
+          grpc = service.update_database_ddl instance_id, database_id,
+                                             statements: statements,
+                                             operation_id: operation_id
+          Database::Job.from_grpc grpc, service
+        end
+      end
+
+      module Admin
+        module Database
+          module V1
+            module DatabaseAdmin
+              class Client
+                def update_database_ddl request, options = nil
+                  raise ::ArgumentError, "request must be provided" if request.nil?
+
+                  request = ::Gapic::Protobuf.coerce request, to: ::Google::Cloud::Spanner::Admin::Database::V1::UpdateDatabaseDdlRequest
+
+                  # Converts hash and nil to an options object
+                  options = ::Gapic::CallOptions.new(**options.to_h) if options.respond_to? :to_h
+
+                  # Customize the options with defaults
+                  metadata = @config.rpcs.update_database_ddl.metadata.to_h
+
+                  # Set x-goog-api-client and x-goog-user-project headers
+                  metadata[:"x-goog-api-client"] ||= ::Gapic::Headers.x_goog_api_client \
+                    lib_name: @config.lib_name, lib_version: @config.lib_version,
+                    gapic_version: ::Google::Cloud::Spanner::Admin::Database::V1::VERSION
+                  metadata[:"x-goog-user-project"] = @quota_project_id if @quota_project_id
+
+                  header_params = {}
+                  if request.database
+                    header_params["database"] = request.database
+                  end
+
+                  request_params_header = header_params.map { |k, v| "#{k}=#{v}" }.join("&")
+                  metadata[:"x-goog-request-params"] ||= request_params_header
+
+                  options.apply_defaults timeout:      @config.rpcs.update_database_ddl.timeout,
+                                         metadata:     metadata,
+                                         retry_policy: @config.rpcs.update_database_ddl.retry_policy
+
+                  options.apply_defaults timeout:      @config.timeout,
+                                         metadata:     @config.metadata,
+                                         retry_policy: @config.retry_policy
+
+                  puts "==== #{self.class}#update_database_ddl ===="
+                  p request
+                  p options
+                  puts
+                  @database_admin_stub.call_rpc :update_database_ddl, request, options: options do |response, operation|
+                    response = ::Gapic::Operation.new response, @operations_client, options: options
+                    yield response, operation if block_given?
+                    return response
+                  end
+                rescue ::GRPC::BadStatus => e
+                  raise ::Google::Cloud::Error.from_error(e)
+                end
+              end
+            end
+          end
+        end
+      end
     end
   end
 end
