@@ -71,6 +71,7 @@ jobs:
       SPANNER_TEST_DATABASE: test-database
       AR_VERSION: "~> 7.0.4"
     steps:
+    - run: docker images
     - uses: actions/checkout@v3
     - uses: ruby/setup-ruby@v1
       with:
