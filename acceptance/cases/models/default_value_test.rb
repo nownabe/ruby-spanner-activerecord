@@ -6,6 +6,19 @@ require "test_helpers/with_separate_database"
 module ActiveRecord
   module ConnectionAdapters
     module Spanner
+      module DatabaseStatements
+        def execute_ddl statements
+          log "MIGRATION", "SCHEMA" do
+            ActiveSupport::Dependencies.interlock.permit_concurrent_loads do
+              puts "==== #{self.class}#execute_ddl ===="
+              p statements
+              @connection.execute_ddl statements
+            end
+          end
+        rescue Google::Cloud::Error => error
+          raise ActiveRecord::StatementInvalid, error
+        end
+      end
       module SchemaStatements
         def create_table(table_name, id: :primary_key, **options)
           td = create_table_definition table_name, options
@@ -38,11 +51,44 @@ module ActiveRecord
             statements << schema_creation.accept(id)
           end
 
+          puts "==== #{self.class}#create_table ===="
           p statements
 
           execute_schema_statements statements
         end
       end
+    end
+  end
+end
+
+module ActiveRecordSpannerAdapter
+  class Connection
+    def execute_ddl statements, operation_id: nil, wait_until_done: true
+      raise "DDL cannot be executed during a transaction" if current_transaction&.active?
+      self.current_transaction = nil
+
+      statements = Array statements
+      return unless statements.any?
+
+      # If a DDL batch is active we only buffer the statements on the connection until the batch is run.
+      if @ddl_batch
+        @ddl_batch.push(*statements)
+        return true
+      end
+
+      puts "==== #{self.class}#execute_ddl ===="
+      p statements
+
+      execute_ddl_statements statements, operation_id, wait_until_done
+    end
+
+    def execute_ddl_statements statements, operation_id, wait_until_done
+      puts "==== #{self.class}#execute_ddl_statements ===="
+      p statements
+      job = database.update statements: statements, operation_id: operation_id
+      job.wait_until_done! if wait_until_done
+      raise Google::Cloud::Error.from_error job.error if job.error?
+      job.done?
     end
   end
 end

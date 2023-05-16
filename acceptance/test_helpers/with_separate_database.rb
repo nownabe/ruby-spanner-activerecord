@@ -19,7 +19,7 @@ module TestHelpers
     end
 
     def teardown
-      # spanner_adapter_connection.database.drop
+      spanner_adapter_connection.database.drop
     end
 
     def connection_config
