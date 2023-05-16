@@ -54,3 +54,31 @@ jobs:
         SPANNER_EMULATOR_HOST: localhost:9010
         SPANNER_TEST_PROJECT: test-project
         SPANNER_TEST_INSTANCE: test-instance
+
+  emulator:
+    runs-on: ubuntu-latest
+
+    services:
+      emulator:
+        image: gcr.io/cloud-spanner-emulator/emulator:latest
+        ports:
+          - 9010:9010
+          - 9020:9020
+    env:
+      SPANNER_EMULATOR_HOST: localhost:9010
+      SPANNER_TEST_PROJECT: test-project
+      SPANNER_TEST_INSTANCE: test-instance
+      SPANNER_TEST_DATABASE: test-database
+      AR_VERSION: "~> 7.0.4"
+    steps:
+    - uses: actions/checkout@v3
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: "3.1"
+    - run: bundle install
+    - uses: actions/setup-go@v4
+    - name: Install spanner-cli
+      run: go install github.com/cloudspannerecosystem/spanner-cli@latest
+    - run: bundle exec ruby create_database.rb
+    - run: $(go env GOPATH)/bin/spanner-cli -p $SPANNER_TEST_PROJECT -i $SPANNER_TEST_INSTANCE -d $SPANNER_TEST_DATABASE -e 'CREATE TABLE `dynamic_items` (`id` INT64 NOT NULL, `col_timestamp` TIMESTAMP DEFAULT (CURRENT_TIMESTAMP())) PRIMARY KEY (`id`)'
+    - run: $(go env GOPATH)/bin/spanner-cli -p $SPANNER_TEST_PROJECT -i $SPANNER_TEST_INSTANCE -d $SPANNER_TEST_DATABASE -e 'SHOW CREATE TABLE `dynamic_items`'
